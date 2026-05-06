@@ -1,198 +1,234 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { MapComponent } from "./map";
-import { Search, ShieldAlert, Smartphone, Wifi, Battery, MapPin } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Search, Smartphone, Wifi, Battery, MapPin, RotateCcw, Mail, KeyRound, CheckCircle2 } from "lucide-react";
 
-const steps = [
-  "Connexion aux serveurs Google sécurisés...",
-  "Authentification de l'appareil cible...",
-  "Extraction des journaux de localisation (24h)...",
-  "Triangulation GPS et Wi-Fi...",
-  "Contournement des proxys de sécurité...",
-  "Localisation exacte trouvée avec succès."
+const SCAN_STEPS = [
+  { label: "Connexion OAuth2 aux serveurs Google", pct: 15 },
+  { label: "Authentification des identifiants", pct: 28 },
+  { label: "Accès au service Find My Device", pct: 42 },
+  { label: "Extraction des journaux de position (72h)", pct: 58 },
+  { label: "Triangulation GPS + Wi-Fi + Cell", pct: 74 },
+  { label: "Résolution des coordonnées exactes", pct: 88 },
+  { label: "Chiffrement et livraison du résultat", pct: 100 },
 ];
+
+const DEVICE_MODELS = [
+  "Samsung Galaxy S24 Ultra",
+  "iPhone 15 Pro Max",
+  "Google Pixel 8 Pro",
+  "OnePlus 12",
+  "Xiaomi 14 Ultra",
+];
+
+const NETWORKS = ["5G NR", "LTE-A", "4G+", "5G SA"];
 
 export function EmailTracker() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [status, setStatus] = useState<"idle" | "scanning" | "found">("idle");
+  const [phase, setPhase] = useState<"form" | "scanning" | "result">("form");
   const [progress, setProgress] = useState(0);
-  const [stepText, setStepText] = useState("");
-  const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [location, setLocation] = useState<{ lat: number; lng: number; city: string } | null>(null);
 
-  const handleLocate = () => {
+  const cities = [
+    { lat: 48.8566, lng: 2.3522, city: "Paris, France" },
+    { lat: 9.5370, lng: -13.6773, city: "Conakry, Guinée" },
+    { lat: 5.3600, lng: -4.0083, city: "Abidjan, Côte d'Ivoire" },
+    { lat: 14.6928, lng: -17.4467, city: "Dakar, Sénégal" },
+    { lat: 6.3676, lng: 2.4252, city: "Cotonou, Bénin" },
+  ];
+
+  const handleScan = () => {
     if (!email || code.length !== 6) return;
-    
-    setStatus("scanning");
+    setPhase("scanning");
     setProgress(0);
-    
-    let currentStep = 0;
-    setStepText(steps[0]);
+    setCurrentStep(0);
 
-    const interval = setInterval(() => {
-      setProgress(p => {
-        const next = p + (100 / (steps.length * 10)); // smooth progress
-        
-        // Update text based on progress thresholds
-        const expectedStep = Math.floor((next / 100) * steps.length);
-        if (expectedStep > currentStep && expectedStep < steps.length) {
-          currentStep = expectedStep;
-          setStepText(steps[currentStep]);
-        }
-
-        if (next >= 100) {
-          clearInterval(interval);
-          setStatus("found");
-          // Fake realistic coordinates (e.g. Paris)
-          setLocation({ lat: 48.8566 + (Math.random() * 0.05), lng: 2.3522 + (Math.random() * 0.05) });
-          return 100;
-        }
-        return next;
-      });
-    }, 50);
+    let step = 0;
+    const run = () => {
+      if (step >= SCAN_STEPS.length) {
+        const pick = cities[Math.floor(Math.random() * cities.length)];
+        setLocation({
+          lat: pick.lat + (Math.random() * 0.04 - 0.02),
+          lng: pick.lng + (Math.random() * 0.04 - 0.02),
+          city: pick.city,
+        });
+        setPhase("result");
+        return;
+      }
+      setCurrentStep(step);
+      setProgress(SCAN_STEPS[step].pct);
+      step++;
+      setTimeout(run, 800 + Math.random() * 600);
+    };
+    setTimeout(run, 400);
   };
 
-  return (
-    <Card className="border-primary/20 bg-card/50 backdrop-blur-sm relative overflow-hidden">
-      <div className="absolute inset-0 data-bg opacity-20 pointer-events-none" />
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-2xl">
-          <Smartphone className="w-6 h-6 text-primary" />
-          Localisation via Compte Google
-        </CardTitle>
-        <CardDescription className="text-muted-foreground font-mono">
-          SYSTÈME D'INTERCEPTION DE SIGNAUX • PROTOCOLE G-TRACK v4.2
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6 relative z-10">
-        
-        {status === "idle" && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="font-mono text-primary uppercase text-xs">CIBLE EMAIL (GMAIL)</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="cible@gmail.com" 
+  const battery = Math.floor(Math.random() * 60) + 5;
+  const device = DEVICE_MODELS[Math.floor(email.length % DEVICE_MODELS.length)];
+  const network = NETWORKS[Math.floor(code.length % NETWORKS.length)];
+  const accuracy = Math.floor(Math.random() * 8) + 2;
+
+  if (phase === "form") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-start gap-3 pb-5 border-b border-border">
+          <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 mt-0.5">
+            <Mail className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Localisation via Compte Google</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Protocole G-Track v5.1 — Accès Find My Device
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">
+              Adresse Gmail cible
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="email"
+                placeholder="exemple@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="font-mono bg-background/50 border-primary/30 focus-visible:ring-primary"
+                onChange={e => setEmail(e.target.value)}
+                className="pl-9 font-mono h-11 bg-card border-border focus-visible:ring-primary/50 focus-visible:border-primary/50"
+                data-testid="input-email"
               />
             </div>
-            <div className="space-y-2">
-              <Label className="font-mono text-primary uppercase text-xs">CODE D'AUTORISATION SYSTÈME</Label>
-              <InputOTP maxLength={6} value={code} onChange={setCode}>
-                <InputOTPGroup className="gap-2 w-full justify-between">
-                  {[0,1,2,3,4,5].map(i => (
-                    <InputOTPSlot key={i} index={i} className="border-primary/30 font-mono bg-background/50 h-12 w-12 text-lg" />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
-            <Button 
-              className="w-full font-mono font-bold tracking-widest mt-4 group" 
-              size="lg"
-              onClick={handleLocate}
-              disabled={!email || code.length !== 6}
-            >
-              <Search className="w-4 h-4 mr-2 group-hover:text-white" />
-              LANCER LA LOCALISATION
-            </Button>
           </div>
-        )}
 
-        {status === "scanning" && (
-          <div className="space-y-6 py-8 text-center font-mono">
-            <div className="relative w-32 h-32 mx-auto mb-8">
-              <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
-              <div className="absolute inset-0 rounded-full border-t-2 border-primary radar-sweep" />
-              <Search className="w-10 h-10 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pulse-pin" />
-            </div>
-            
-            <div className="space-y-2 text-left">
-              <div className="flex justify-between text-xs text-primary">
-                <span>PROGRESSION</span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="h-1 bg-primary/20" />
-              <p className="text-xs text-muted-foreground h-4">{stepText}</p>
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5" />
+              Code de vérification Google (6 chiffres)
+            </label>
+            <InputOTP maxLength={6} value={code} onChange={setCode}>
+              <InputOTPGroup className="gap-2 w-full justify-between">
+                {[0,1,2,3,4,5].map(i => (
+                  <InputOTPSlot
+                    key={i}
+                    index={i}
+                    className="flex-1 h-12 text-lg font-mono bg-card border-border focus-within:border-primary/60 rounded-lg"
+                  />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+            <p className="text-xs text-muted-foreground font-mono">
+              Entrez le code reçu par SMS ou via l'application Google Authenticator
+            </p>
           </div>
-        )}
 
-        {status === "found" && location && (
-          <div className="space-y-6 animate-in fade-in zoom-in duration-500">
-            <div className="flex items-center gap-2 text-secondary bg-secondary/10 p-3 rounded border border-secondary/20 font-mono text-sm">
-              <ShieldAlert className="w-5 h-5" />
-              SIGNAL CAPTÉ ET DÉCRYPTÉ AVEC SUCCÈS
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-sm">
-              <div className="space-y-3 bg-background/50 p-4 rounded border border-border">
-                <h4 className="text-primary font-bold border-b border-primary/20 pb-2 mb-3 flex items-center gap-2">
-                  <Smartphone className="w-4 h-4" /> DONNÉES APPAREIL
-                </h4>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">LATITUDE</span>
-                  <span className="text-foreground">{location.lat.toFixed(6)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">LONGITUDE</span>
-                  <span className="text-foreground">{location.lng.toFixed(6)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">PRÉCISION</span>
-                  <span className="text-secondary">± 4 Mètres</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">MODÈLE</span>
-                  <span className="text-foreground">iPhone 14 Pro Max</span>
-                </div>
-              </div>
-              
-              <div className="space-y-3 bg-background/50 p-4 rounded border border-border">
-                <h4 className="text-primary font-bold border-b border-primary/20 pb-2 mb-3 flex items-center gap-2">
-                  <Wifi className="w-4 h-4" /> RÉSEAU & STATUT
-                </h4>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">CONNEXION</span>
-                  <span className="text-foreground">5G / LTE</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">IP DYNAMIQUE</span>
-                  <span className="text-foreground">109.12.34.XX</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">BATTERIE</span>
-                  <span className="text-destructive flex items-center gap-1"><Battery className="w-3 h-3"/> 14%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">DERNIÈRE SYNC</span>
-                  <span className="text-foreground">À l'instant</span>
-                </div>
-              </div>
-            </div>
+          <Button
+            className="w-full h-11 font-medium gap-2"
+            onClick={handleScan}
+            disabled={!email || code.length !== 6}
+            data-testid="button-locate-email"
+          >
+            <Search className="w-4 h-4" />
+            Lancer la localisation
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-            <div className="rounded-lg overflow-hidden border-2 border-primary/30 relative">
-              <div className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-primary border border-primary/50 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-destructive pulse-pin"></span>
-                LIVE TRACKING
-              </div>
-              <MapComponent latitude={location.lat} longitude={location.lng} zoom={15} />
-            </div>
-
-            <Button variant="outline" className="w-full font-mono" onClick={() => setStatus("idle")}>
-              NOUVELLE RECHERCHE
-            </Button>
+  if (phase === "scanning") {
+    return (
+      <div className="space-y-6 py-2">
+        <div className="flex items-start gap-3 pb-5 border-b border-border">
+          <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20">
+            <Mail className="w-5 h-5 text-primary" />
           </div>
-        )}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Localisation en cours</h2>
+            <p className="text-sm text-muted-foreground font-mono">{email}</p>
+          </div>
+        </div>
 
-      </CardContent>
-    </Card>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground font-mono">Progression</span>
+            <span className="font-mono font-medium text-primary">{progress}%</span>
+          </div>
+          <Progress value={progress} className="h-1.5 bg-muted" />
+        </div>
+
+        <div className="space-y-2.5">
+          {SCAN_STEPS.map((step, i) => (
+            <div key={i} className="flex items-center gap-2.5 text-sm font-mono">
+              {i < currentStep ? (
+                <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />
+              ) : i === currentStep ? (
+                <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-primary pulse-dot" />
+                </div>
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-border/50 flex-shrink-0" />
+              )}
+              <span className={i <= currentStep ? "text-foreground" : "text-muted-foreground/40"}>
+                {step.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    location && (
+      <div className="space-y-5 fade-up">
+        <div className="flex items-center gap-3 pb-5 border-b border-border">
+          <div className="p-2.5 rounded-lg bg-secondary/10 border border-secondary/20">
+            <MapPin className="w-5 h-5 text-secondary" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-secondary">Appareil localisé</h2>
+            <p className="text-sm text-muted-foreground font-mono">{location.city}</p>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary/10 border border-secondary/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary pulse-dot" />
+            <span className="text-xs font-mono text-secondary font-medium">LIVE</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl overflow-hidden border border-border" style={{ height: 320 }}>
+          <MapComponent latitude={location.lat} longitude={location.lng} zoom={14} label={location.city} className="h-full w-full" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { icon: MapPin, label: "Coordonnées GPS", value: `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`, accent: "text-primary" },
+            { icon: MapPin, label: "Ville", value: location.city, accent: "text-primary" },
+            { icon: Smartphone, label: "Appareil", value: device, accent: "text-foreground" },
+            { icon: Wifi, label: "Réseau", value: network, accent: "text-foreground" },
+            { icon: Battery, label: "Batterie", value: `${battery}%`, accent: battery < 20 ? "text-destructive" : "text-secondary" },
+            { icon: CheckCircle2, label: "Précision GPS", value: `±${accuracy} mètres`, accent: "text-secondary" },
+          ].map(({ icon: Icon, label, value, accent }) => (
+            <div key={label} className="px-3 py-2.5 rounded-lg bg-muted/30 border border-border/60">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Icon className="w-3 h-3 text-muted-foreground" />
+                <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{label}</span>
+              </div>
+              <p className={`text-sm font-medium ${accent} font-mono truncate`}>{value}</p>
+            </div>
+          ))}
+        </div>
+
+        <Button variant="outline" className="w-full gap-2" onClick={() => { setPhase("form"); setCode(""); }}>
+          <RotateCcw className="w-4 h-4" />
+          Nouvelle recherche
+        </Button>
+      </div>
+    )
   );
 }
