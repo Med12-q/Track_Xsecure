@@ -2,11 +2,6 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
 
 interface MapProps {
   latitude: number;
@@ -16,51 +11,46 @@ interface MapProps {
   label?: string;
 }
 
-export function MapComponent({ latitude, longitude, zoom = 13, className = "h-[320px] w-full", label }: MapProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<L.Map | null>(null);
-  const markerInstance = useRef<L.Marker | null>(null);
+export function MapComponent({ latitude, longitude, zoom = 13, className = "h-72 w-full", label }: MapProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const map = useRef<L.Map | null>(null);
+  const marker = useRef<L.Marker | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    if (!mapInstance.current) {
-      mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView([latitude, longitude], zoom);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-      }).addTo(mapInstance.current);
-      L.control.zoom({ position: 'bottomright' }).addTo(mapInstance.current);
+    if (!ref.current) return;
+    if (!map.current) {
+      map.current = L.map(ref.current, { zoomControl: false, attributionControl: false })
+        .setView([latitude, longitude], zoom);
+
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 })
+        .addTo(map.current);
+
+      L.control.zoom({ position: "bottomright" }).addTo(map.current);
 
       const icon = L.divIcon({
-        className: '',
-        html: `<div style="position:relative;width:28px;height:28px;">
-          <div style="position:absolute;inset:0;border-radius:50%;background:hsl(185 100% 50%/0.2);animation:ping 2s cubic-bezier(0,0,.2,1) infinite;"></div>
-          <div style="position:absolute;inset:0;border-radius:50%;border:2px solid hsl(185 100% 50%/0.5);animation:ping 2s cubic-bezier(0,0,.2,1) infinite;animation-delay:0.5s;"></div>
-          <div style="position:absolute;inset:7px;border-radius:50%;background:hsl(185 100% 50%);box-shadow:0 0 16px hsl(185 100% 50%/0.9),0 0 32px hsl(185 100% 50%/0.4);"></div>
-        </div>
-        <style>@keyframes ping{75%,100%{transform:scale(2.5);opacity:0}}</style>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        className: "",
+        html: `
+          <div style="position:relative;width:32px;height:32px;">
+            <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid #00e5ff44;animation:rping 2s ease-out infinite;"></div>
+            <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid #00e5ff33;animation:rping 2s ease-out infinite 0.7s;"></div>
+            <div style="position:absolute;inset:9px;border-radius:50%;background:#00e5ff;box-shadow:0 0 16px #00e5ffcc,0 0 32px #00e5ff66;"></div>
+          </div>
+          <style>@keyframes rping{0%{transform:scale(0.8);opacity:.8}100%{transform:scale(2.8);opacity:0}}</style>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
       });
 
-      markerInstance.current = L.marker([latitude, longitude], { icon }).addTo(mapInstance.current);
+      marker.current = L.marker([latitude, longitude], { icon }).addTo(map.current);
       if (label) {
-        markerInstance.current.bindPopup(
-          `<div style="font-family:Share Tech Mono,monospace;font-size:11px;color:#050505;padding:3px 6px;background:#00e5ff;border-radius:3px;">${label}</div>`,
-          { className: 'custom-popup' }
-        ).openPopup();
+        marker.current.bindPopup(label, { maxWidth: 200 }).openPopup();
       }
     } else {
-      mapInstance.current.setView([latitude, longitude], zoom);
-      markerInstance.current?.setLatLng([latitude, longitude]);
+      map.current.setView([latitude, longitude], zoom);
+      marker.current?.setLatLng([latitude, longitude]);
     }
   }, [latitude, longitude, zoom, label]);
 
-  useEffect(() => {
-    return () => {
-      if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; }
-    };
-  }, []);
+  useEffect(() => () => { map.current?.remove(); map.current = null; }, []);
 
-  return <div ref={mapRef} className={className} style={{ zIndex: 1 }} />;
+  return <div ref={ref} className={className} style={{ zIndex: 1 }} />;
 }
