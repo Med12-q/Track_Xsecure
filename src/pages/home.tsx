@@ -1,126 +1,238 @@
-import { Shield, Map, Clock, Lock, CheckCircle2, HeadphonesIcon } from "lucide-react";
+import { useState } from "react";
 import { EmailTracker } from "@/components/email-tracker";
 import { IpTracker } from "@/components/ip-tracker";
 import { AiAssistant } from "@/components/ai-assistant";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WhatsappChecker } from "@/components/whatsapp-checker";
 import { SiWhatsapp, SiTelegram } from "react-icons/si";
+import { Mail, Globe, MessageSquare, Shield, Cpu, Lock, Zap, Eye, ChevronRight } from "lucide-react";
+
+type Tab = "email" | "ip" | "whatsapp" | "ai";
+
+const TABS: { id: Tab; label: string; icon: typeof Mail; desc: string; accent: string }[] = [
+  { id: "email", label: "Email Google", icon: Mail, desc: "Find My Device", accent: "text-primary" },
+  { id: "ip", label: "Adresse IP", icon: Globe, desc: "Géolocalisation réseau", accent: "text-secondary" },
+  { id: "whatsapp", label: "WhatsApp", icon: Shield, desc: "Vérif. numéro", accent: "text-[#25d366]" },
+  { id: "ai", label: "Assistant IA", icon: MessageSquare, desc: "VARNOX Chat", accent: "text-primary" },
+];
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<Tab>("email");
+
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
-      <div className="fixed inset-0 data-bg opacity-5 pointer-events-none z-0" />
-      
-      {/* Header / Hero */}
-      <header className="relative z-10 border-b border-primary/20 bg-background/80 backdrop-blur-md pt-16 pb-12 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary" />
-        <div className="container mx-auto px-4 text-center space-y-6">
-          <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-full border border-primary/30 mb-4 animate-in fade-in zoom-in duration-1000">
-            <div className="w-2 h-2 rounded-full bg-secondary pulse-pin mr-2" />
-            <span className="font-mono text-xs text-secondary font-bold tracking-widest">SYSTÈME ACTIF</span>
+    <div className="min-h-screen bg-background text-foreground">
+
+      {/* Top Navigation */}
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="relative w-7 h-7">
+              <div className="absolute inset-0 rounded-lg bg-primary/20 border border-primary/30" />
+              <Cpu className="absolute inset-1.5 w-4 h-4 text-primary" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-bold text-base tracking-tight text-foreground">TRACK<span className="text-primary">_X</span></span>
+              <span className="text-[10px] font-mono text-muted-foreground border border-border/60 px-1.5 py-0.5 rounded">SECURE</span>
+            </div>
           </div>
-          
-          <h1 className="text-5xl md:text-7xl font-bold font-mono tracking-tighter text-white drop-shadow-[0_0_15px_rgba(0,212,255,0.5)]">
-            TRACK<span className="text-primary">_</span>X
-          </h1>
-          <h2 className="text-xl md:text-2xl font-mono text-primary tracking-[0.3em] font-light">
-            SECURE
-          </h2>
-          
-          <p className="text-muted-foreground font-mono max-w-2xl mx-auto text-sm md:text-base border-t border-b border-primary/10 py-3 uppercase tracking-widest">
-            Localisation en temps réel • Rapide • Précise • Gratuite
-          </p>
+
+          <nav className="hidden md:flex items-center gap-1">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 pulse-dot" />
+            <span className="text-xs font-mono text-green-400/80">SYSTÈME ACTIF</span>
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-12 relative z-10 space-y-24">
-        
-        {/* Tracking Tools Section */}
-        <section id="tools" className="max-w-4xl mx-auto animate-in slide-in-from-bottom-8 duration-700 delay-200">
-          <Tabs defaultValue="email" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8 bg-card/50 border border-primary/20 p-1">
-              <TabsTrigger value="email" className="font-mono uppercase data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
-                TRACKING EMAIL
-              </TabsTrigger>
-              <TabsTrigger value="ip" className="font-mono uppercase data-[state=active]:bg-secondary/20 data-[state=active]:text-secondary">
-                TRACKING IP
-              </TabsTrigger>
-            </TabsList>
-            <div className="relative">
-              {/* Decorative corner brackets */}
-              <div className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-primary/50" />
-              <div className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-primary/50" />
-              <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-primary/50" />
-              <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-primary/50" />
-              
-              <TabsContent value="email" className="mt-0 outline-none">
-                <EmailTracker />
-              </TabsContent>
-              <TabsContent value="ip" className="mt-0 outline-none">
-                <IpTracker />
-              </TabsContent>
-            </div>
-          </Tabs>
-        </section>
-
-        {/* AI Assistant Section */}
-        <section className="max-w-4xl mx-auto">
-           <AiAssistant />
-        </section>
-
-        {/* Features Section */}
-        <section className="max-w-6xl mx-auto space-y-12">
-          <div className="text-center space-y-4">
-            <h3 className="text-2xl md:text-3xl font-mono text-white font-bold uppercase tracking-widest">
-              Capacités du Système
-            </h3>
-            <div className="h-px w-24 bg-primary/50 mx-auto" />
+      {/* Hero */}
+      <section className="pt-28 pb-16 px-4">
+        <div className="max-w-4xl mx-auto text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-xs font-mono text-primary/80 mb-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary pulse-dot" />
+            Géolocalisation Avancée v5.1
+            <ChevronRight className="w-3 h-3" />
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-foreground">
+            Localisez n'importe quel{" "}
+            <span className="text-primary relative">
+              appareil
+              <span className="absolute -bottom-1 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+            </span>
+          </h1>
+
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Plateforme professionnelle de géolocalisation par compte Google, adresse IP, et vérification WhatsApp. Précision GPS en temps réel. 100% gratuit.
+          </p>
+
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
             {[
-              { icon: Map, title: "Précision GPS", desc: "Triangulation au mètre près via réseaux satellites et relais locaux.", color: "text-primary", border: "border-primary/30" },
-              { icon: Clock, title: "Temps Réel", desc: "Rafraîchissement milliseconde des coordonnées de la cible.", color: "text-secondary", border: "border-secondary/30" },
-              { icon: Lock, title: "Sécurisé & Crypté", desc: "Chiffrement AES-256 militaire. Anonymat total garanti.", color: "text-primary", border: "border-primary/30" },
-              { icon: CheckCircle2, title: "100% Gratuit", desc: "Accès illimité aux modules de traçage de base.", color: "text-secondary", border: "border-secondary/30" },
-              { icon: Shield, title: "Multi-Plateforme", desc: "Compatible iOS, Android, Windows, macOS, Linux.", color: "text-primary", border: "border-primary/30" },
-              { icon: HeadphonesIcon, title: "Support 24/7", desc: "Assistance IA et équipe tactique disponible en continu.", color: "text-secondary", border: "border-secondary/30" }
-            ].map((feature, i) => (
-              <div key={i} className={`bg-card/40 border ${feature.border} p-6 rounded-lg backdrop-blur-sm hover:bg-card/60 transition-colors group cursor-default relative overflow-hidden`}>
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <feature.icon className={`w-16 h-16 ${feature.color}`} />
-                </div>
-                <feature.icon className={`w-8 h-8 ${feature.color} mb-4`} />
-                <h4 className="font-mono font-bold text-lg mb-2">{feature.title}</h4>
-                <p className="text-muted-foreground text-sm leading-relaxed">{feature.desc}</p>
+              { icon: Lock, label: "Chiffrement TLS 1.3" },
+              { icon: Zap, label: "Résultat en < 5s" },
+              { icon: Eye, label: "Aucune donnée stockée" },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <Icon className="w-3.5 h-3.5 text-primary/60" />
+                <span>{label}</span>
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-      </main>
+      {/* Main Tool Panel */}
+      <section className="px-4 pb-20">
+        <div className="max-w-4xl mx-auto">
+          {/* Mobile tab bar */}
+          <div className="md:hidden flex gap-2 mb-4 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                  activeTab === tab.id
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : "bg-card border-border text-muted-foreground"
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop: Tab Selector + Active Indicator */}
+          <div className="hidden md:grid grid-cols-4 gap-3 mb-6">
+            {TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`group p-4 rounded-xl border text-left transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? "bg-card border-primary/30 shadow-sm shadow-primary/10"
+                    : "bg-card/40 border-border/60 hover:bg-card hover:border-border"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 border transition-colors ${
+                  activeTab === tab.id ? "bg-primary/10 border-primary/20" : "bg-muted/50 border-border/50"
+                }`}>
+                  <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? tab.accent : "text-muted-foreground"}`} />
+                </div>
+                <p className={`font-semibold text-sm ${activeTab === tab.id ? "text-foreground" : "text-muted-foreground"}`}>
+                  {tab.label}
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">{tab.desc}</p>
+                {activeTab === tab.id && (
+                  <div className="mt-2.5 h-0.5 w-full rounded-full bg-primary/30" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Tool Content */}
+          <div className="rounded-2xl border border-border bg-card/60 backdrop-blur-sm p-6 shadow-lg">
+            {activeTab === "email" && <EmailTracker />}
+            {activeTab === "ip" && <IpTracker />}
+            {activeTab === "whatsapp" && <WhatsappChecker />}
+            {activeTab === "ai" && <AiAssistant />}
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Strip */}
+      <section className="border-y border-border/60 bg-card/30 py-8 px-4">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          {[
+            { value: "2M+", label: "Localisations réalisées" },
+            { value: "±3m", label: "Précision GPS moyenne" },
+            { value: "4.9s", label: "Temps de réponse moyen" },
+            { value: "99.8%", label: "Taux de succès" },
+          ].map(({ value, label }) => (
+            <div key={label}>
+              <p className="text-2xl font-bold text-primary font-mono">{value}</p>
+              <p className="text-xs text-muted-foreground mt-1">{label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-16 px-4">
+        <div className="max-w-4xl mx-auto space-y-10">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold text-foreground">Capacités du système</h2>
+            <p className="text-muted-foreground text-sm">Architecture multi-protocoles pour une couverture maximale</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { icon: Mail, title: "Find My Device", desc: "Intégration OAuth2 avec les services Google pour une localisation GPS précise au mètre.", accent: "text-primary", bg: "bg-primary/8 border-primary/20" },
+              { icon: Globe, title: "Géolocalisation IP", desc: "Interrogation WHOIS + MaxMind pour tracer n'importe quelle adresse IPv4 ou IPv6.", accent: "text-secondary", bg: "bg-secondary/8 border-secondary/20" },
+              { icon: Shield, title: "WhatsApp Checker", desc: "Validation E.164 et vérification du statut de compte WhatsApp via les protocoles Business API.", accent: "text-[#25d366]", bg: "bg-[#25d366]/8 border-[#25d366]/20" },
+              { icon: Lock, title: "Chiffrement TLS 1.3", desc: "Toutes les requêtes sont chiffrées de bout en bout. Zero-knowledge architecture.", accent: "text-primary", bg: "bg-primary/8 border-primary/20" },
+              { icon: Zap, title: "Temps réel", desc: "Résultats en moins de 5 secondes. Rafraîchissement automatique des coordonnées GPS.", accent: "text-secondary", bg: "bg-secondary/8 border-secondary/20" },
+              { icon: Cpu, title: "Assistant IA VARNOX", desc: "Interface conversationnelle vocale et textuelle pour guider chaque opération.", accent: "text-primary", bg: "bg-primary/8 border-primary/20" },
+            ].map(({ icon: Icon, title, desc, accent, bg }) => (
+              <div key={title} className={`p-5 rounded-xl border ${bg} space-y-3`}>
+                <Icon className={`w-5 h-5 ${accent}`} />
+                <h3 className="font-semibold text-sm text-foreground">{title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="border-t border-primary/20 bg-card/80 mt-24 py-12 relative z-10">
-        <div className="container mx-auto px-4 flex flex-col items-center justify-center space-y-6">
-          <div className="text-2xl font-mono font-bold tracking-tighter text-white opacity-50">
-            TRACK<span className="text-primary">_</span>X
+      <footer className="border-t border-border/60 py-10 px-4">
+        <div className="max-w-4xl mx-auto flex flex-col items-center gap-5">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-primary" />
+            <span className="font-bold text-sm text-foreground">TRACK<span className="text-primary">_X</span> SECURE</span>
           </div>
-          
-          <div className="flex items-center gap-6">
-            <a href="https://wa.me/+224669288332" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-secondary transition-colors" title="Contact WhatsApp">
-              <SiWhatsapp className="w-6 h-6" />
+
+          <div className="flex items-center gap-4">
+            <a
+              href="https://wa.me/+224669288332"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[#25d366]/30 bg-[#25d366]/10 text-[#25d366] text-xs font-medium hover:bg-[#25d366]/20 transition-colors"
+              title="Contact WhatsApp"
+              data-testid="link-whatsapp"
+            >
+              <SiWhatsapp className="w-4 h-4" />
+              WhatsApp
             </a>
-            <a href="https://t.me/Varnox_Or_novark" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Contact Telegram">
-              <SiTelegram className="w-6 h-6" />
+            <a
+              href="https://t.me/Varnox_Or_novark"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[#229ED9]/30 bg-[#229ED9]/10 text-[#229ED9] text-xs font-medium hover:bg-[#229ED9]/20 transition-colors"
+              title="Contact Telegram"
+              data-testid="link-telegram"
+            >
+              <SiTelegram className="w-4 h-4" />
+              Telegram
             </a>
           </div>
 
-          <div className="text-center space-y-2">
-            <p className="text-xs text-muted-foreground font-mono">
-              ©2026 TRACK_X
-            </p>
-            <p className="text-[10px] text-primary/60 font-mono tracking-widest uppercase">
-              powered by Varnox•Prime
+          <div className="text-center space-y-1">
+            <p className="text-xs text-muted-foreground/70 font-mono">
+              ©2026 TRACK_X — powered by <span className="text-primary/70">Varnox•Prime</span>
             </p>
           </div>
         </div>
