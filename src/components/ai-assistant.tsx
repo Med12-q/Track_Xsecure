@@ -2,185 +2,146 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Mic, Send, Volume2, VolumeX, Bot, User, Cpu, Loader2 } from "lucide-react";
 
-declare global {
-  interface Window { SpeechRecognition: any; webkitSpeechRecognition: any; }
-}
+declare global { interface Window { SpeechRecognition: any; webkitSpeechRecognition: any; } }
 
-interface Message { id: string; role: "user" | "ai"; text: string; timestamp: Date; }
+interface Msg { id: string; role: "user" | "ai"; text: string; ts: Date; }
 
 const KB: [string[], string][] = [
-  [["qui t'a développé", "créateur", "développeur", "who made", "who created", "who developed"], "Je suis développé par ∇ΔΓΗΘΞ ϷΓΙΜΝΝΝΝ ΤΝCϮ ΘFFΙCΙΔL, ingénieur spécialisé en cybersécurité et systèmes de géolocalisation avancée."],
-  [["track_x", "trackx", "ce site", "cette application", "c'est quoi", "what is"], "TRACK_X SECURE est une plateforme professionnelle de géolocalisation. Elle localise les appareils via compte Google (Find My Device), adresse IP (MaxMind), et vérifie les numéros WhatsApp."],
-  [["localiser", "locate", "trouver", "find phone", "retrouver", "comment"], "Utilisez l'onglet 'Email Google' pour une précision GPS maximale (±3m), ou 'Adresse IP' pour tracer le nœud réseau de la cible. Le vérificateur 'WhatsApp' contrôle le statut d'un numéro."],
-  [["ip", "adresse ip", "géolocalisation ip", "tracer ip"], "La géolocalisation IP interroge les bases WHOIS et MaxMind en temps réel pour localiser le routeur FAI de la cible. Précision : ville/région. Les VPN/proxies peuvent fausser le résultat."],
-  [["google", "gmail", "find my device", "oauth"], "La localisation via Google utilise OAuth2 pour accéder au service Find My Device. Elle offre une précision GPS de ±2 à 10 mètres selon la qualité du signal de l'appareil."],
-  [["whatsapp", "banni", "ban", "numéro whatsapp", "actif"], "Le vérificateur WhatsApp valide le numéro en format E.164 international et détermine s'il est actif, banni ou inactif via les protocoles de validation WhatsApp Business."],
-  [["sécurité", "sécurisé", "chiffrement", "crypté", "safe", "secure"], "TRACK_X utilise TLS 1.3 pour toutes les communications. Architecture zero-knowledge : aucune donnée n'est stockée sur nos serveurs. Anonymat total garanti."],
-  [["précision", "exactitude", "précis", "accuracy"], "GPS via Google ≈ ±3m, triangulation cellulaire ≈ ±50m, géolocalisation IP ≈ ±5km. Coordonnées mises à jour en temps réel via les protocoles de localisation."],
-  [["bonjour", "salut", "hello", "hi", "bonsoir", "hey"], "Bonjour. Je suis VARNOX, l'assistant IA de TRACK_X SECURE. Je peux vous aider à utiliser les outils de localisation, ou répondre à vos questions de cybersécurité."],
-  [["merci", "thank", "thanks", "parfait", "excellent", "super"], "Je vous en prie. N'hésitez pas si vous avez d'autres questions sur nos systèmes de localisation."],
-  [["aide", "help", "utiliser", "tutoriel", "guide", "fonctionnalités"], "Fonctionnalités disponibles :\n① Email Google → localisation GPS précise\n② Adresse IP → géolocalisation réseau\n③ WhatsApp Ban → vérification de numéro\n④ VARNOX → assistant IA vocal et textuel 24/7"],
-  [["varnox", "ia", "ai", "assistant", "intelligence"], "VARNOX est l'IA intégrée à TRACK_X SECURE. Je réponds par texte et par voix, je guide les opérations de localisation et fournis des analyses de cybersécurité en temps réel."],
+  [["qui t'a développé", "créateur", "développeur", "who made", "who created"], "Je suis développé par ∇ΔΓΗΘΞ ϷΓΙΜΝΝΝΝ ΤΝCϮ ΘFFΙCΙΔL — ingénieur spécialisé en cybersécurité, géolocalisation avancée et systèmes d'intelligence artificielle."],
+  [["track_x", "ce site", "cette application", "c'est quoi", "what is"], "TRACK_X SECURE est une plateforme de géolocalisation d'appareils mobiles de niveau professionnel. Elle comprend 4 modules : localisation IP, tracking Google, vérification WhatsApp, et assistant IA VARNOX."],
+  [["localiser", "locate", "trouver", "find", "retrouver", "comment"], "Pour localiser un appareil :\n① Module IP → traçage du nœud réseau FAI (MaxMind)\n② Module Gmail → localisation GPS précise (Find My Device)\nPrécision : de ±3m (GPS) à ±5km (IP)"],
+  [["ip", "adresse ip", "géolocalisation ip", "tracer ip"], "La géolocalisation IP interroge les bases WHOIS, ARIN, RIPE et MaxMind GeoIP2 en temps réel. Elle localise le dernier routeur FAI connu. Les VPN/proxies peuvent masquer la position réelle."],
+  [["google", "gmail", "find my device", "oauth"], "La localisation Google utilise OAuth2 pour accéder au service Find My Device. Elle offre une précision GPS de ±2 à 10 mètres via triangulation multi-satellites + Wi-Fi + Cell Tower."],
+  [["whatsapp", "banni", "ban", "numéro", "actif", "checker"], "Le vérificateur WhatsApp valide les numéros en format E.164 international et détermine si le compte est actif, banni ou inactif via les protocoles WhatsApp Business API."],
+  [["sécurité", "sécurisé", "chiffrement", "crypté", "safe", "secure"], "TRACK_X utilise TLS 1.3 + AES-256 pour toutes les communications. Architecture zero-knowledge : aucune donnée n'est stockée. Anonymat total garanti par design."],
+  [["précision", "exactitude", "accuracy", "précis"], "GPS via Google ≈ ±2-10m\nTriangulation Cell Tower ≈ ±50-500m\nGéolocalisation IP ≈ ±1-50km\nTous les résultats sont actualisés en temps réel."],
+  [["bonjour", "salut", "hello", "hi", "bonsoir"], "Bonjour. Système VARNOX opérationnel.\nJe suis l'assistant IA de TRACK_X SECURE.\nTapez 'aide' pour voir toutes les commandes disponibles."],
+  [["merci", "thank", "thanks", "parfait", "bravo", "super"], "Je vous en prie. TRACK_X est à votre service 24/7. N'hésitez pas si vous avez d'autres questions."],
+  [["aide", "help", "utiliser", "fonctionnalités", "guide", "commandes"], "Modules disponibles :\n① IP → géolocalisation réseau réelle\n② Gmail → tracking GPS précis\n③ WhatsApp → vérification statut ban\n④ VARNOX → assistant IA vocal & textuel\n\nPosez vos questions librement."],
+  [["varnox", "ia", "ai", "assistant", "intelligence artificielle"], "VARNOX est l'IA embarquée de TRACK_X SECURE. Réponses textuelles et vocales. Connaissance complète des systèmes de localisation et de cybersécurité. Disponible 24/7."],
 ];
 
-function getResponse(input: string): string {
+function getResp(input: string): string {
   const n = input.toLowerCase().trim();
-  for (const [keys, resp] of KB) {
-    if (keys.some(k => n.includes(k))) return resp;
-  }
-  return "Requête non reconnue dans ma base de données. Reformulez votre question concernant la localisation, la cybersécurité ou l'utilisation de TRACK_X SECURE. Commandes disponibles : aide, localiser, IP, WhatsApp, sécurité.";
+  for (const [keys, resp] of KB) if (keys.some(k => n.includes(k))) return resp;
+  return "Requête non reconnue. Reformulez votre question concernant la localisation, la cybersécurité ou les fonctionnalités de TRACK_X. Tapez 'aide' pour la liste complète.";
 }
 
 export function AiAssistant() {
-  const [messages, setMessages] = useState<Message[]>([{
-    id: "init", role: "ai", timestamp: new Date(),
-    text: "Système VARNOX initialisé. Je suis l'assistant IA de TRACK_X SECURE.\n\nPosez vos questions par écrit ou utilisez le microphone. Tapez 'aide' pour voir toutes les fonctionnalités disponibles.",
+  const [msgs, setMsgs] = useState<Msg[]>([{
+    id: "0", role: "ai", ts: new Date(),
+    text: "Système VARNOX initialisé et opérationnel.\n\nJe suis l'assistant IA de TRACK_X SECURE.\nPosez vos questions par écrit ou via le microphone.\n\nTapez 'aide' pour voir toutes les fonctionnalités disponibles.",
   }]);
-  const [inputText, setInputText] = useState("");
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [isThinking, setIsThinking] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const [input, setInput] = useState("");
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [thinking, setThinking] = useState(false);
+  const recogRef = useRef<any>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SR) {
-      recognitionRef.current = new SR();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = "fr-FR";
-      recognitionRef.current.onresult = (e: any) => {
-        const text = e.results[0][0].transcript;
-        setInputText(text);
-        setIsListening(false);
-        sendMessage(text);
-      };
-      recognitionRef.current.onerror = () => setIsListening(false);
-      recognitionRef.current.onend = () => setIsListening(false);
+      recogRef.current = new SR();
+      recogRef.current.continuous = false; recogRef.current.interimResults = false; recogRef.current.lang = "fr-FR";
+      recogRef.current.onresult = (e: any) => { const t = e.results[0][0].transcript; setInput(t); setListening(false); send(t); };
+      recogRef.current.onerror = () => setListening(false);
+      recogRef.current.onend = () => setListening(false);
     }
-    return () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); };
+    return () => { recogRef.current?.stop(); window.speechSynthesis?.cancel(); };
   }, []);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isThinking]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, thinking]);
 
   const speak = useCallback((text: string) => {
-    if (!voiceEnabled) return;
+    if (!voiceOn) return;
     window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    const fr = voices.find(v => v.lang.startsWith("fr") && v.name.includes("Google")) || voices.find(v => v.lang.startsWith("fr"));
-    if (fr) utt.voice = fr;
-    utt.rate = 1.0;
-    utt.onstart = () => setIsSpeaking(true);
-    utt.onend = () => setIsSpeaking(false);
-    utt.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utt);
-  }, [voiceEnabled]);
+    const u = new SpeechSynthesisUtterance(text);
+    const vs = window.speechSynthesis.getVoices();
+    const fr = vs.find(v => v.lang.startsWith("fr") && v.name.includes("Google")) || vs.find(v => v.lang.startsWith("fr"));
+    if (fr) u.voice = fr;
+    u.rate = 1.0;
+    u.onstart = () => setSpeaking(true);
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(u);
+  }, [voiceOn]);
 
-  const sendMessage = useCallback((text: string) => {
-    const t = text.trim();
-    if (!t) return;
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", text: t, timestamp: new Date() }]);
-    setInputText("");
-    setIsThinking(true);
-    const delay = Math.min(600 + t.length * 10, 2000);
+  const send = useCallback((text: string) => {
+    const t = text.trim(); if (!t) return;
+    setMsgs(p => [...p, { id: Date.now().toString(), role: "user", text: t, ts: new Date() }]);
+    setInput(""); setThinking(true);
     setTimeout(() => {
-      const resp = getResponse(t);
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: resp, timestamp: new Date() }]);
-      setIsThinking(false);
-      speak(resp);
-    }, delay);
+      const r = getResp(t);
+      setMsgs(p => [...p, { id: (Date.now() + 1).toString(), role: "ai", text: r, ts: new Date() }]);
+      setThinking(false); speak(r);
+    }, Math.min(600 + t.length * 8, 1800));
   }, [speak]);
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (inputText.trim()) sendMessage(inputText);
-  };
-
   const toggleMic = () => {
-    if (!recognitionRef.current) return;
-    if (isListening) { recognitionRef.current.stop(); }
-    else {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-      try { recognitionRef.current.start(); setIsListening(true); } catch {}
-    }
+    if (!recogRef.current) return;
+    if (listening) recogRef.current.stop();
+    else { window.speechSynthesis.cancel(); setSpeaking(false); try { recogRef.current.start(); setListening(true); } catch {} }
   };
 
   const fmt = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-  const statusColor = isListening ? "text-red-400" : isSpeaking ? "text-cyan-400" : isThinking ? "text-yellow-500" : "text-[#25d366]";
-  const statusLabel = isListening ? "ÉCOUTE..." : isSpeaking ? "PARLE..." : isThinking ? "RÉFLEXION..." : "EN LIGNE";
-
   return (
-    <div className="flex flex-col h-[560px]">
+    <div className="flex flex-col" style={{ height: 560 }}>
       {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b border-cyan-500/15 flex-shrink-0">
-        <div className={`relative w-9 h-9 rounded-lg border flex items-center justify-center transition-all duration-300 ${
-          isListening ? "border-red-500/40 bg-red-500/5" :
-          isSpeaking ? "border-cyan-500/40 bg-cyan-500/5" :
-          "border-cyan-500/20 bg-cyan-500/3"
-        }`}>
-          <Cpu className={`w-4 h-4 ${statusColor} transition-colors duration-300`} />
-          <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-black ${
-            isListening ? "bg-red-400" : isSpeaking ? "bg-cyan-400 pulse-dot" : isThinking ? "bg-yellow-500 pulse-dot" : "bg-green-400"
-          }`} />
+      <div className="flex items-center gap-3 pb-4 flex-shrink-0" style={{ borderBottom: "1px solid #00e5ff0f" }}>
+        <div className="relative w-10 h-10 rounded-lg flex items-center justify-center transition-all"
+          style={{ border: `1px solid ${listening ? "#ff444440" : "#00e5ff25"}`, background: listening ? "#ff44430a" : "#00e5ff08" }}>
+          <Cpu className="w-5 h-5 transition-colors" style={{ color: listening ? "#ff4444" : "#00e5ff" }} />
+          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2" style={{
+            borderColor: "#040404",
+            background: listening ? "#ff4444" : speaking ? "#00e5ff" : thinking ? "#facc15" : "#22c55e",
+          }} />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-display font-bold text-sm tracking-widest text-white">VARNOX</span>
-            <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
-              isListening ? "border-red-500/40 text-red-400" :
-              isSpeaking ? "border-cyan-500/40 text-cyan-400" :
-              isThinking ? "border-yellow-500/40 text-yellow-500" :
-              "border-[#25d366]/30 text-[#25d366]"
-            }`}>{statusLabel}</span>
+            <span className="font-tech text-sm font-bold tracking-widest" style={{ color: "#00e5ff" }}>VARNOX</span>
+            <span className="font-tech text-xs px-2 py-0.5 rounded font-bold"
+              style={{
+                border: `1px solid ${listening ? "#ff444440" : "#00e5ff30"}`,
+                color: listening ? "#ff4444" : speaking ? "#00e5ff" : thinking ? "#facc15" : "#22c55e",
+              }}>
+              {listening ? "ÉCOUTE" : speaking ? "PARLE" : thinking ? "RÉFLEXION" : "EN LIGNE"}
+            </span>
           </div>
-          <p className="text-[10px] font-mono text-gray-700">Assistant IA — TRACK_X SECURE</p>
+          <p className="text-xs font-mono mt-0.5" style={{ color: "#333" }}>Module 04 — Assistant IA TRACK_X</p>
         </div>
-        <button onClick={() => { setVoiceEnabled(v => !v); window.speechSynthesis.cancel(); setIsSpeaking(false); }}
-          className="ml-auto p-2 rounded-lg border border-white/8 bg-white/3 text-gray-600 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
-          {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        <button onClick={() => { setVoiceOn(v => !v); window.speechSynthesis.cancel(); setSpeaking(false); }}
+          className="ml-auto w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+          style={{ border: "1px solid #111", background: "transparent", color: voiceOn ? "#00e5ff88" : "#333", cursor: "pointer" }}>
+          {voiceOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
         </button>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 py-3">
-        <div className="space-y-3 pr-1">
-          {messages.map(msg => (
-            <div key={msg.id} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border ${
-                msg.role === "ai" ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-400" : "bg-white/5 border-white/10 text-gray-500"
-              }`}>
-                {msg.role === "ai" ? <Bot className="w-3 h-3" /> : <User className="w-3 h-3" />}
+      <ScrollArea className="flex-1 py-4">
+        <div className="space-y-4 pr-1">
+          {msgs.map(m => (
+            <div key={m.id} className={`flex gap-2.5 ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ border: m.role === "ai" ? "1px solid #00e5ff25" : "1px solid #222", background: m.role === "ai" ? "#00e5ff0a" : "#0a0a0a" }}>
+                {m.role === "ai" ? <Bot className="w-3.5 h-3.5" style={{ color: "#00e5ff" }} /> : <User className="w-3.5 h-3.5" style={{ color: "#555" }} />}
               </div>
-              <div className={`max-w-[82%] space-y-1 flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                <div className={`px-3 py-2 rounded-xl text-sm font-sans leading-relaxed whitespace-pre-line ${
-                  msg.role === "ai"
-                    ? "bg-black/60 border border-cyan-500/12 text-gray-300 rounded-tl-sm"
-                    : "bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 rounded-tr-sm"
-                }`}>
-                  {msg.text}
-                </div>
-                <span className="text-[9px] font-mono text-gray-700 px-1">{fmt(msg.timestamp)}</span>
+              <div className={`max-w-[82%] flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
+                {m.role === "ai" ? <div className="bubble-ai">{m.text}</div> : <div className="bubble-user">{m.text}</div>}
+                <span className="text-xs font-mono mt-1 px-1" style={{ color: "#222" }}>{fmt(m.ts)}</span>
               </div>
             </div>
           ))}
-
-          {isThinking && (
-            <div className="flex gap-2">
-              <div className="w-6 h-6 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Bot className="w-3 h-3 text-cyan-400" />
+          {thinking && (
+            <div className="flex gap-2.5">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ border: "1px solid #00e5ff25", background: "#00e5ff0a" }}>
+                <Bot className="w-3.5 h-3.5" style={{ color: "#00e5ff" }} />
               </div>
-              <div className="px-3 py-2 rounded-xl rounded-tl-sm bg-black/60 border border-cyan-500/12">
-                <div className="flex items-center gap-1.5">
-                  <Loader2 className="w-3 h-3 text-cyan-400/60 animate-spin" />
-                  <span className="text-xs font-mono text-gray-700">Traitement...</span>
-                </div>
+              <div className="bubble-ai flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#00e5ff55" }} />
+                <span style={{ color: "#333", fontSize: "12px", fontFamily: "'JetBrains Mono'" }}>Traitement en cours...</span>
               </div>
             </div>
           )}
@@ -189,31 +150,41 @@ export function AiAssistant() {
       </ScrollArea>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 pt-3 border-t border-cyan-500/10 flex-shrink-0">
+      <form onSubmit={e => { e.preventDefault(); if (input.trim()) send(input); }}
+        className="flex items-center gap-2 pt-3 flex-shrink-0" style={{ borderTop: "1px solid #00e5ff0a" }}>
         <button type="button" onClick={toggleMic}
-          className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border transition-all duration-200 ${
-            isListening
-              ? "bg-red-500/10 border-red-500/40 text-red-400"
-              : "bg-white/3 border-white/8 text-gray-600 hover:text-cyan-400 hover:border-cyan-500/30"
-          }`} title={isListening ? "Arrêter" : "Parler"}>
-          {isListening ? (
-            <div className="flex items-end gap-0.5 h-4">
-              {[1,2,3,4,5].map(i => <span key={i} className={`w-0.5 bg-red-400 rounded-full voice-bar-${i}`} />)}
+          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
+          style={{
+            border: listening ? "1px solid #ff444440" : "1px solid #111",
+            background: listening ? "#ff44430a" : "transparent",
+            color: listening ? "#ff4444" : "#333", cursor: "pointer",
+          }}>
+          {listening ? (
+            <div className="flex items-end gap-0.5 h-5">
+              {[1,2,3,4,5].map(i => <span key={i} className={`w-0.5 rounded-full voice-bar-${i}`} style={{ background: "#ff4444" }} />)}
             </div>
-          ) : <Mic className="w-3.5 h-3.5" />}
+          ) : <Mic className="w-4 h-4" />}
         </button>
 
-        <input
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
+        <input value={input} onChange={e => setInput(e.target.value)} disabled={listening}
           placeholder="Posez votre question à VARNOX..."
-          disabled={isListening}
-          className="flex-1 px-3 py-2 rounded-lg text-sm bg-black/50 border border-cyan-500/12 text-gray-300 font-sans placeholder:text-gray-700 focus:outline-none focus:border-cyan-500/35 focus:shadow-[0_0_8px_hsl(185_100%_50%/0.08)] transition-all"
+          className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none transition-all"
+          style={{
+            background: "#060606", border: "1px solid #00e5ff15",
+            color: "#aaa", fontFamily: "'Rajdhani', sans-serif", fontWeight: 500,
+          }}
+          onFocus={e => e.target.style.borderColor = "#00e5ff35"}
+          onBlur={e => e.target.style.borderColor = "#00e5ff15"}
         />
 
-        <button type="submit" disabled={!inputText.trim() || isThinking}
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 hover:shadow-[0_0_12px_hsl(185_100%_50%/0.2)] disabled:opacity-25 disabled:cursor-not-allowed transition-all">
-          <Send className="w-3.5 h-3.5" />
+        <button type="submit" disabled={!input.trim() || thinking}
+          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
+          style={{
+            border: "1px solid #00e5ff30", background: "#00e5ff0a", color: "#00e5ff",
+            cursor: input.trim() && !thinking ? "pointer" : "not-allowed",
+            opacity: input.trim() && !thinking ? 1 : 0.3,
+          }}>
+          <Send className="w-4 h-4" />
         </button>
       </form>
     </div>
