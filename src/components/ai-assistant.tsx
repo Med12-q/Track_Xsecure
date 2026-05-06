@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Mic, MicOff, Terminal as TerminalIcon, Cpu, MessageSquare } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Mic, MicOff, Send, Volume2, VolumeX, Bot, User, Cpu } from "lucide-react";
 
-// Fallback types for SpeechRecognition
 declare global {
   interface Window {
     SpeechRecognition: any;
@@ -16,224 +15,259 @@ interface Message {
   id: string;
   role: "user" | "ai";
   text: string;
+  timestamp: Date;
 }
 
-const PREDEFINED_RESPONSES: Record<string, string> = {
-  "qui t'a développé": "Je suis développé par ∇ΔΓΗΘΞ ϷΓΙΜΝΝΝΝ ΤΝCϮ ΘFFΙCΙΔL",
-  "who developed you": "Je suis développé par ∇ΔΓΗΘΞ ϷΓΙΜΝΝΝΝ ΤΝCϮ ΘFFΙCΙΔL",
-  "qui est ton créateur": "Je suis développé par ∇ΔΓΗΘΞ ϷΓΙΜΝΝΝΝ ΤΝCϮ ΘFFΙCΙΔL",
-  "comment localiser un téléphone": "Pour localiser un téléphone, utilisez notre module de localisation par adresse E-mail Google pour une précision GPS, ou l'adresse IP pour retracer le dernier nœud de connexion.",
-  "comment ça marche": "TRACK_X utilise des protocoles avancés de triangulation GPS via compte Google et de géolocalisation IP pour cibler les appareils.",
-  "est-ce sécurisé": "Affirmatif. Nos systèmes utilisent un cryptage de bout en bout AES-256. Aucune donnée n'est stockée sur nos serveurs.",
-  "bonjour": "Salutations. Assistant IA VARNOX activé. Comment puis-je vous assister dans votre traçage aujourd'hui ?",
-  "hello": "Greetings. VARNOX AI Assistant activated. How may I assist you with your tracking operations today?"
-};
+const KB: [string[], string][] = [
+  [["qui t'a développé", "qui es ton créateur", "who made you", "ton développeur", "développeur", "créateur"], "Je suis développé par ∇ΔΓΗΘΞ ϷΓΙΜΝΝΝΝ ΤΝCϮ ΘFFΙCΙΔL, ingénieur en cybersécurité et expert en systèmes de géolocalisation avancés."],
+  [["track_x", "trackx", "ce site", "cette application", "c'est quoi", "what is"], "TRACK_X SECURE est une plateforme professionnelle de géolocalisation d'appareils mobiles. Elle permet la localisation via compte Google (Find My Device) et via adresse IP, avec une précision GPS optimisée."],
+  [["localiser", "locate", "trouver", "retrouver", "find"], "Pour localiser un appareil : utilisez l'onglet 'Email Google' pour une précision GPS maximale (nécessite identifiants + code), ou l'onglet 'IP' pour tracer l'adresse réseau de la cible. Le vérificateur WhatsApp valide également le statut d'un numéro."],
+  [["ip", "adresse ip", "géolocalisation ip"], "La géolocalisation IP interroge les bases WHOIS et MaxMind pour localiser le routeur FAI de la cible. Précision : ville/région. Les VPN et proxies peuvent masquer la position réelle."],
+  [["google", "gmail", "find my device"], "La localisation via compte Google utilise le protocole OAuth2 pour accéder au service Find My Device. Elle offre une précision GPS de ±2 à 10 mètres selon la qualité du signal."],
+  [["whatsapp", "banni", "ban", "numéro whatsapp"], "Le vérificateur WhatsApp analyse le statut d'un numéro de téléphone (format E.164 international). Il détermine si le compte est actif, banni, ou inactif via les protocoles de validation."],
+  [["sécurité", "sécurisé", "chiffrement", "crypté", "sécurise"], "TRACK_X SECURE utilise un chiffrement TLS 1.3 pour toutes les communications. Aucune donnée personnelle n'est stockée sur nos serveurs. Les requêtes sont anonymisées via zero-knowledge architecture."],
+  [["précision", "exactitude", "précis"], "La précision dépend de la méthode : GPS via Google ≈ ±3m, triangulation cellulaire ≈ ±50m, géolocalisation IP ≈ ±5km. Les résultats sont mis à jour en temps réel."],
+  [["bonjour", "salut", "hello", "hi", "bonsoir"], "Bonjour. Je suis VARNOX, l'assistant IA intégré à TRACK_X SECURE. Comment puis-je vous assister aujourd'hui ?"],
+  [["merci", "thank", "thanks", "parfait", "excellent"], "Je vous en prie. N'hésitez pas si vous avez d'autres questions concernant nos outils de localisation ou de cybersécurité."],
+  [["aide", "help", "comment utiliser", "tutoriel", "guide"], "Voici les fonctionnalités disponibles :\n1. Email Google → localisation GPS précise\n2. Adresse IP → géolocalisation réseau\n3. Vérificateur WhatsApp → statut du numéro\n4. Moi, VARNOX → assistance vocale et textuelle 24/7"],
+];
+
+function getResponse(input: string): string {
+  const normalized = input.toLowerCase().trim();
+  for (const [keys, response] of KB) {
+    if (keys.some(k => normalized.includes(k))) return response;
+  }
+  return "Je n'ai pas trouvé de réponse précise pour cette requête dans ma base de connaissances. Reformulez votre question concernant la localisation, la cybersécurité ou l'utilisation de TRACK_X SECURE.";
+}
 
 export function AiAssistant() {
+  const [messages, setMessages] = useState<Message[]>([{
+    id: "init",
+    role: "ai",
+    text: "Bonjour, je suis VARNOX — l'assistant IA de TRACK_X SECURE. Posez-moi vos questions par écrit ou en vocal. Je peux vous aider à utiliser les outils de localisation, vous informer sur la cybersécurité, ou simplement discuter.",
+    timestamp: new Date(),
+  }]);
+  const [inputText, setInputText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: "init", role: "ai", text: "SYSTÈME VARNOX INITIALISÉ. En attente de commande vocale." }
-  ]);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [isThinking, setIsThinking] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Initialize speech recognition
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      recognitionRef.current = new SR();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-      // You can set language dynamically or default to French since the prompt implies mostly French interface
-      recognitionRef.current.lang = 'fr-FR';
-
-      recognitionRef.current.onstart = () => {
-        setIsListening(true);
-      };
-
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        handleUserVoice(transcript);
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
+      recognitionRef.current.lang = "fr-FR";
+      recognitionRef.current.onresult = (e: any) => {
+        const text = e.results[0][0].transcript;
+        setInputText(text);
         setIsListening(false);
+        sendMessage(text);
       };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+      recognitionRef.current.onerror = () => setIsListening(false);
+      recognitionRef.current.onend = () => setIsListening(false);
     }
-
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-      window.speechSynthesis.cancel();
+      recognitionRef.current?.stop();
+      window.speechSynthesis?.cancel();
     };
   }, []);
 
   useEffect(() => {
-    // Auto scroll to bottom
-    if (scrollRef.current) {
-      const scrollArea = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollArea) {
-        scrollArea.scrollTop = scrollArea.scrollHeight;
-      }
-    }
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isThinking]);
 
-  const speak = (text: string) => {
+  const speak = useCallback((text: string) => {
+    if (!voiceEnabled) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    // Try to find a French voice
+    const utt = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    const frVoice = voices.find(v => v.lang.startsWith('fr'));
-    if (frVoice) {
-      utterance.voice = frVoice;
-    }
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    
-    window.speechSynthesis.speak(utterance);
-  };
+    const fr = voices.find(v => v.lang.startsWith("fr") && v.name.includes("Google")) ||
+               voices.find(v => v.lang.startsWith("fr"));
+    if (fr) utt.voice = fr;
+    utt.rate = 1.0;
+    utt.pitch = 1.0;
+    utt.onstart = () => setIsSpeaking(true);
+    utt.onend = () => setIsSpeaking(false);
+    utt.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utt);
+  }, [voiceEnabled]);
 
-  const getSmartResponse = (input: string) => {
-    const normalizedInput = input.toLowerCase().trim();
-    
-    // Check predefined matches
-    for (const [key, response] of Object.entries(PREDEFINED_RESPONSES)) {
-      if (normalizedInput.includes(key)) {
-        return response;
-      }
-    }
+  const sendMessage = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
 
-    // Default responses based on keywords
-    if (normalizedInput.includes("ip")) {
-      return "La localisation IP trace le routeur du fournisseur d'accès internet de la cible. C'est rapide mais la précision dépend de l'infrastructure réseau.";
-    }
-    
-    if (normalizedInput.includes("google") || normalizedInput.includes("gmail")) {
-      return "La localisation via compte Google nécessite l'autorisation d'accès. Elle offre une précision GPS de l'ordre de quelques mètres.";
-    }
-
-    return "Commande non reconnue dans la base de données. Veuillez reformuler votre requête concernant le traçage, la sécurité ou l'utilisation du système.";
-  };
-
-  const handleUserVoice = (text: string) => {
-    const userMsg: Message = { id: Date.now().toString(), role: "user", text };
+    const userMsg: Message = { id: Date.now().toString(), role: "user", text: trimmed, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
-    
-    // Process response
+    setInputText("");
+    setIsThinking(true);
+
+    const delay = 600 + trimmed.length * 8;
     setTimeout(() => {
-      const responseText = getSmartResponse(text);
-      const aiMsg: Message = { id: (Date.now() + 1).toString(), role: "ai", text: responseText };
+      const response = getResponse(trimmed);
+      const aiMsg: Message = { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: new Date() };
       setMessages(prev => [...prev, aiMsg]);
-      speak(responseText);
-    }, 500);
+      setIsThinking(false);
+      speak(response);
+    }, Math.min(delay, 2200));
+  }, [speak]);
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (inputText.trim()) sendMessage(inputText);
   };
 
-  const toggleListening = () => {
+  const toggleMic = () => {
     if (!recognitionRef.current) {
-      const aiMsg: Message = { id: Date.now().toString(), role: "ai", text: "Erreur: Interface vocale non supportée par votre navigateur." };
-      setMessages(prev => [...prev, aiMsg]);
+      sendMessage("microphone non supporté");
       return;
     }
-
     if (isListening) {
       recognitionRef.current.stop();
     } else {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        console.error(e);
-      }
+      try { recognitionRef.current.start(); setIsListening(true); } catch {}
     }
   };
 
+  const fmt = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
   return (
-    <Card className="border-primary/20 bg-card/50 backdrop-blur-sm relative overflow-hidden">
-      <div className="absolute inset-0 crt opacity-10 pointer-events-none" />
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-2xl text-primary">
-          <Cpu className="w-6 h-6" />
-          Assistant IA • VARNOX
-        </CardTitle>
-        <CardDescription className="text-muted-foreground font-mono">
-          INTERFACE VOCALE DE COMMANDEMENT
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        
-        <div className="flex flex-col items-center justify-center py-6">
-          <div 
-            className={`w-24 h-24 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all duration-300
-              ${isListening ? 'border-destructive bg-destructive/10 breathe-orb-listening' : 
-                isSpeaking ? 'border-secondary bg-secondary/10 breathe-orb-speaking' : 
-                'border-primary bg-primary/10 breathe-orb'}`}
-            onClick={toggleListening}
-            role="button"
-            title="Activer/Désactiver le microphone"
-          >
-            {isListening ? (
-              <MicOff className="w-8 h-8 text-destructive animate-pulse" />
-            ) : isSpeaking ? (
-              <MessageSquare className="w-8 h-8 text-secondary animate-pulse" />
-            ) : (
-              <Mic className="w-8 h-8 text-primary" />
-            )}
+    <div className="flex flex-col h-[600px]">
+      <div className="flex items-center gap-3 pb-4 border-b border-border flex-shrink-0">
+        <div className="relative">
+          <div className={`p-2.5 rounded-xl border transition-all duration-300 ${
+            isListening ? "bg-destructive/10 border-destructive/40" :
+            isSpeaking ? "bg-primary/10 border-primary/40" :
+            isThinking ? "bg-secondary/10 border-secondary/40" :
+            "bg-muted/40 border-border"
+          }`}>
+            <Cpu className={`w-5 h-5 transition-colors duration-300 ${
+              isListening ? "text-destructive" :
+              isSpeaking ? "text-primary" :
+              isThinking ? "text-secondary" :
+              "text-muted-foreground"
+            }`} />
           </div>
-          <div className="mt-4 text-xs font-mono font-bold tracking-widest text-center h-4">
-            {isListening ? (
-              <span className="text-destructive">ÉCOUTE EN COURS...</span>
-            ) : isSpeaking ? (
-              <span className="text-secondary">RÉPONSE IA...</span>
-            ) : (
-              <span className="text-primary">EN VEILLE. CLIQUEZ POUR PARLER.</span>
-            )}
-          </div>
+          <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background ${
+            isListening ? "bg-destructive" :
+            isSpeaking ? "bg-primary pulse-dot" :
+            isThinking ? "bg-secondary pulse-dot" :
+            "bg-green-500"
+          }`} />
         </div>
+        <div>
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            VARNOX
+            <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border border-border/60">
+              {isListening ? "ÉCOUTE..." : isSpeaking ? "PARLE..." : isThinking ? "RÉFLEXION..." : "EN LIGNE"}
+            </span>
+          </h2>
+          <p className="text-xs text-muted-foreground">Assistant IA — TRACK_X SECURE</p>
+        </div>
+        <button
+          onClick={() => { setVoiceEnabled(v => !v); window.speechSynthesis.cancel(); setIsSpeaking(false); }}
+          className="ml-auto p-2 rounded-lg border border-border/60 bg-card/40 hover:bg-card transition-colors text-muted-foreground hover:text-foreground"
+          title={voiceEnabled ? "Désactiver la voix" : "Activer la voix"}
+        >
+          {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        </button>
+      </div>
 
-        <div className="bg-background/80 border border-primary/30 rounded p-4 font-mono text-sm relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent"></div>
-          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-primary/20 text-xs text-primary/70">
-            <TerminalIcon className="w-3 h-3" />
-            <span>TERMINAL_LOGS</span>
-          </div>
-          
-          <ScrollArea className="h-[200px] w-full pr-4" ref={scrollRef}>
-            <div className="space-y-4">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`text-[10px] mb-1 opacity-50 flex items-center gap-1`}>
-                    {msg.role === 'user' ? 'USER_INPUT' : 'VARNOX_AI'}
-                  </div>
-                  <div 
-                    className={`p-2 rounded border max-w-[85%] ${
-                      msg.role === 'user' 
-                        ? 'bg-primary/10 border-primary/30 text-foreground' 
-                        : 'bg-secondary/10 border-secondary/30 text-secondary'
-                    }`}
-                  >
-                    {msg.role === 'ai' ? (
-                      <span className="typing-effect">{msg.text}</span>
-                    ) : (
-                      msg.text
-                    )}
-                  </div>
+      <ScrollArea className="flex-1 py-4">
+        <div className="space-y-4 pr-2">
+          {messages.map(msg => (
+            <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border ${
+                msg.role === "ai"
+                  ? "bg-primary/10 border-primary/20 text-primary"
+                  : "bg-muted border-border text-muted-foreground"
+              }`}>
+                {msg.role === "ai" ? <Bot className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
+              </div>
+              <div className={`max-w-[80%] space-y-1 ${msg.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
+                <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                  msg.role === "ai"
+                    ? "bg-card border border-border/80 text-foreground rounded-tl-sm"
+                    : "bg-primary text-primary-foreground rounded-tr-sm"
+                }`}>
+                  {msg.text}
                 </div>
-              ))}
+                <span className="text-[10px] text-muted-foreground/60 font-mono px-1">
+                  {fmt(msg.timestamp)}
+                </span>
+              </div>
             </div>
-          </ScrollArea>
-        </div>
+          ))}
 
-      </CardContent>
-    </Card>
+          {isThinking && (
+            <div className="flex gap-2.5">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-primary/10 border border-primary/20 text-primary">
+                <Bot className="w-3.5 h-3.5" />
+              </div>
+              <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-card border border-border/80">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </ScrollArea>
+
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 pt-4 border-t border-border flex-shrink-0">
+        <button
+          type="button"
+          onClick={toggleMic}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border transition-all duration-200 ${
+            isListening
+              ? "bg-destructive/15 border-destructive/40 text-destructive"
+              : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+          }`}
+          title={isListening ? "Arrêter l'écoute" : "Parler"}
+        >
+          {isListening ? (
+            <div className="flex items-end gap-0.5 h-4">
+              <span className="w-0.5 bg-destructive rounded-full voice-bar-1" />
+              <span className="w-0.5 bg-destructive rounded-full voice-bar-2" />
+              <span className="w-0.5 bg-destructive rounded-full voice-bar-3" />
+              <span className="w-0.5 bg-destructive rounded-full voice-bar-4" />
+              <span className="w-0.5 bg-destructive rounded-full voice-bar-5" />
+            </div>
+          ) : (
+            <Mic className="w-4 h-4" />
+          )}
+        </button>
+
+        <Input
+          ref={inputRef}
+          value={inputText}
+          onChange={e => setInputText(e.target.value)}
+          placeholder="Posez votre question à VARNOX..."
+          className="flex-1 h-10 bg-card border-border focus-visible:ring-primary/40 focus-visible:border-primary/50 font-sans text-sm"
+          disabled={isListening}
+          data-testid="input-ai-message"
+        />
+
+        <Button
+          type="submit"
+          size="icon"
+          className="w-10 h-10 flex-shrink-0"
+          disabled={!inputText.trim() || isThinking}
+          data-testid="button-send-message"
+        >
+          <Send className="w-4 h-4" />
+        </Button>
+      </form>
+    </div>
   );
 }
